@@ -24,20 +24,15 @@ class GrapeHardinessTempextHandler(GrapeHardinessBlockingRequestHandler):
 
         # decode request variables into a dictionary
         request_dict = self.requestAsDict(request)
-        print '\n\nGrapeHardinessTempextHandler.__call__'
-        
+
         # extract location coordinates
         location = self.extractLocationParameters(request_dict)
         lat, lon = location['coords']
-        print '    location :\n', location
 
         target_year = request_dict.get('season', None)
-        print '\n    target_year :', target_year
 
         # get the configured season limits
-        dates = self.extractSeasonDates(request_dict)
-        print '    dates :\n', dates
-
+        dates = self.extractSeasonDates(request_dict, target_year)
         season_start = asDatetimeDate(dates['season_start'])
         season_end = asDatetimeDate(dates['season_end'])
         target_year = dates['season']
@@ -66,7 +61,6 @@ class GrapeHardinessTempextHandler(GrapeHardinessBlockingRequestHandler):
         del data
         if self.mode in ('dev','test'):
             print 'tempexts data retrieved in',elapsedTime(start_response,True)
-        print '\n\nTEMPEXTS RESPONSE\n', response, '\n\n'
 
         self.respondWithJSON(request, '%s}}}' % response)
 
@@ -83,7 +77,6 @@ class GrapeHardinessTempDataHandler(GrapeHardinessVarietyRequestHandler):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def __call__(self, request):
-        print '\n\GrapeHardinessTempDataHandler.__call__'
         start_response = datetime.datetime.now()
 
         # decode request variables into a dictionary
@@ -100,11 +93,11 @@ class GrapeHardinessTempDataHandler(GrapeHardinessVarietyRequestHandler):
             lat = location['lat']
             lon = location['lon']
 
-        # extract season date limits from request
-        dates = self.extractSeasonDates(request_dict)
+        # target_year
+        target_year = request_dict.get('season', None)
+        # get the configured season limits
+        dates = self.extractSeasonDates(request_dict, target_year)
         target_year = dates['season']
-        print '    target_year :', target_year
-        print '    dates :\n', dates
 
         # create a variety file reader
         reader =  self.varietyFileReader(variety, target_year, self.source,
@@ -186,12 +179,12 @@ class GrapeHardinessSeasonDaysHandler(GrapeHardinessBlockingRequestHandler):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def __call__(self, request):
-        print '\n\nGrapeHardinessSeasonDaysHandler.__call__'
         # decode request variables into a dictionary
         request_dict = self.requestAsDict(request)
-        # extract season date limits from request
-        dates = self.extractSeasonDates(request_dict)
-        print '    dates :\n', dates
+        # target_year
+        target_year = request_dict.get('season', None)
+        # get the configured season limits
+        dates = self.extractSeasonDates(request_dict, target_year)
         season_start = asDatetimeDate(dates['season_start'])
         season_end = asDatetimeDate(dates['season_end'])
         # create an array of days for X axis of data plots
