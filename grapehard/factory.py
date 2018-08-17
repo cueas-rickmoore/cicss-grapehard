@@ -3,10 +3,14 @@ import os, sys
 import datetime
 
 from atmosci.seasonal.factory import BasicSeasonalProjectFactory
+from atmosci.seasonal.methods.crop import CropVarietyPathMethods
 from atmosci.utils.config import ConfigObject
 
+from grapehard.grid import GrapeHardinessFileBuilder
 from grapehard.grid import GrapeHardinessFileReader
 from grapehard.grid import GrapeHardinessFileManager
+
+from grapehard.grid import GrapeTemperatureFileBuilder
 from grapehard.grid import GrapeTemperatureFileReader
 from grapehard.grid import GrapeTemperatureFileManager
 
@@ -50,7 +54,7 @@ from grapehard.config import CONFIG
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-class GrapeHardinessFactoryMethods:
+class GrapeHardinessFactoryMethods(CropVarietyPathMethods):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -67,6 +71,17 @@ class GrapeHardinessFactoryMethods:
 
     def filenameTemplate(self, filetype, default=None):
         return self.config.filenames.get(filetype, default)
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def gridFileBuilder(self, filepath, filetype, target_year, source, region,
+                              variety=None, mode='w', **kwargs):
+        Class = self.fileAccessorClass(filetype, 'build')
+        print 'builder class =', Class
+        if filetype == 'tempext': 
+            return Class(filepath, filetype, target_year, source, region,
+                         mode=mode)
+        else: return Class(filepath, target_year, variety, mode=mode, **kwargs)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -129,7 +144,7 @@ class GrapeHardinessFactoryMethods:
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def targetYear(self, date):
+    def seasonDateSpan(self, date):
         season_start = datetime.date(date.year, *self.project.start_day)
         if date >= season_start:
             target_year = date.year+1
@@ -137,8 +152,18 @@ class GrapeHardinessFactoryMethods:
             season_start = datetime.date(date.year-1, *self.project.start_day)
             target_year = date.year
         season_end = datetime.date(target_year, *self.project.end_day)
-        if date <= season_end: return target_year
+        if date <= season_end: return (season_start, season_end)
         else: return None
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def targetYear(self, date):
+        season = self.seasonDateSpan(date)
+        if season is not None:
+            season_start, season_end = season
+            if date >= season_start and date <= season_end:
+                return season_end.year
+        return None
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -196,7 +221,7 @@ class GrapeHardinessFactoryMethods:
     def toolFileReader(self, filetype, target_year, source, region,
                              variety=None, root='tooldata'):
         path = self.toolFilepath(filetype, target_year, source, region,
-                                     variety, root)
+                                 variety, root)
         return self.gridFileReader(path, 'tool', target_year, variety)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -209,23 +234,22 @@ class GrapeHardinessFactoryMethods:
             return self.tool.varieties.get(variety, None)
         else:
             errmsg = 'Unsupported type for "variety" argument : %s'
-            return TypeError, errmsg % str(type(variety))
+            raise TypeError, errmsg % str(type(variety))
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def varietyName(self, variety):
         if isinstance(variety, ConfigObject):
-            tag = variety.get('tag', None)
-            if tag is not None: return tag
-            else: return variety.name
+            return variety.get('tag', variety.name)
         elif isinstance(variety, basestring): return variety
         elif isinstance(variety, dict): return variety['name']
         else:
-            raise TypeError, 'Unsupported type for "variety" argument.'
+            errmsg = '%s is an unsupported type for "variety" argument.'
+            raise TypeError, errmsg % type(variety)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def varietyDirpath(self, source, region, variety, target_year=None,
+    def varietyDirpath(self, variety, source, region, target_year=None,
                              root='project'):
         dirpath = self.sourceDirpath(source, region, root)
         if target_year is not None:
@@ -236,7 +260,7 @@ class GrapeHardinessFactoryMethods:
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def varietyFilename(self, filetype, target_year, variety, source=None,
+    def varietyFilename(self, filetype, variety, target_year, source=None,
                               region=None, **kwargs):
         template = self.filenameTemplate(filetype)
         template_args = self.templateArgs(target_year, source, region, variety) 
@@ -245,20 +269,18 @@ class GrapeHardinessFactoryMethods:
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def varietyFilepath(self, filetype, target_year, variety, source, region,
+    def varietyFilepath(self, filetype, variety, target_year, source, region,
                               root='project', **kwargs):
-        dirpath = self.varietyDirpath(source, region, variety, root=root)
-        filename = \
-            self.varietyFilename(filetype, target_year, variety, **kwargs)
+        if isinstance(variety, basestring):
+            _variety = self.varietyConfig(variety)
+            dirpath = self.varietyDirpath(_variety, source, region, root=root)
+            filename = self.varietyFilename(filetype, _variety, target_year, 
+                                            **kwargs)
+        else:
+            dirpath = self.varietyDirpath(variety, source, region, root=root)
+            filename = self.varietyFilename(filetype, variety, target_year,
+                                            **kwargs)
         return os.path.join(dirpath, filename)
-
-    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-    def varietyToDirpath(self, variety):
-        return self.normalizeDirpath(self.varietyName(variety).lower())
-
-    def varietyToFilepath(self, variety):
-        return self.normalizeFilepath(self.varietyName(variety))
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -278,7 +300,7 @@ class GrapeHardinessFactoryMethods:
         self._registerAccessManagers('tempext',
                                      GrapeTemperatureFileReader,
                                      GrapeTemperatureFileManager,
-                                     GrapeTemperatureFileManager)
+                                     GrapeTemperatureFileBuilder)
 
     # - - - # - - - # - - - # - - - # - - - # - - - # - - - # - - - # - - - #
 
@@ -286,22 +308,24 @@ class GrapeHardinessFactoryMethods:
         self._registerAccessManagers('tool',
                                      GrapeHardinessFileReader,
                                      GrapeHardinessFileManager,
-                                     GrapeHardinessFileManager)
+                                     GrapeHardinessFileBuilder)
 
 
     # - - - # - - - # - - - # - - - # - - - # - - - # - - - # - - - # - - - #
+
+    def _initGrapeVarieties_(self):
+        from frost.grape.config import GRAPE
+        GRAPE.chill.copy('chill', self.tool)
+        GRAPE.dormancy.copy('dormancy', self.tool)
+        GRAPE.varieties.copy('varieties', self.tool)
+        del GRAPE
 
     def _postInitConfig_(self, path_mode):
         self.project = self.config.project
         self.setDirpaths(path_mode)
         self.tool = self.config.tool
         self.toolname = self.config.get('toolname', self.tool.name)
-        if path_mode == 'build':
-            from frost.grape.config import GRAPE
-            GRAPE.chill.copy('chill', self.tool)
-            GRAPE.dormancy.copy('dormancy', self.tool)
-            GRAPE.varieties.copy('varieties', self.tool)
-            del GRAPE
+        self._initGrapeVarieties_()
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -315,8 +339,16 @@ class GrapeHardinessToolFactory(GrapeHardinessFactoryMethods,
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def tempextFileManager(self, target_year, source, region, root='tooldata',
-                                 mode='r'):
+    def tempextFileBuilder(self, target_year, source, region, mode='w',
+                                 root='tooldata'):
+        Class = self.fileAccessorClass('tempext', 'build')
+        path = self.tempextFilepath(target_year, source, region, root)
+        return self.gridFileManager(path, 'tempext', target_year, mode=mode)
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def tempextFileManager(self, target_year, source, region, mode='r',
+                                 root='tooldata'):
         path = self.tempextFilepath(target_year, source, region, root)
         return self.gridFileManager(path, 'tempext', target_year, mode=mode)
 
@@ -328,19 +360,45 @@ class GrapeHardinessToolFactory(GrapeHardinessFactoryMethods,
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+    def varietyFileBuilder(self, variety, target_year, source, region,
+                                 filetype='season', mode='a', root='tooldata',
+                                 **kwargs):
+        season_start, season_end = self.seasonDates(target_year)
+        if 'start_date' in kwargs:
+            start_date = kwargs['start_date']
+            del kwargs['start_date']
+        else: start_date = season_start
+        if 'end_date' in kwargs:
+            end_date = kwargs['end_date']
+            del kwargs['end_date']
+        else: end_date = season_end
+        variety_cfg = self.varietyConfig(variety)
+        path = self.varietyFilepath(filetype, variety_cfg, target_year, source,
+                                    region, root)
+        Class = self.fileAccessorClass('tool', 'build')
+        return Class(path, filetype, target_year, start_date, end_date, 
+                     source, region, variety_cfg, self.tool.dormancy,
+                     self.tool.chill, **kwargs)
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
     def varietyFileManager(self, variety, target_year, source, region,
                                 filetype='season', root='tooldata', mode='r'):
-        path = self.varietyFilepath(filetype, target_year, variety, source,
+        variety_cfg = self.varietyConfig(variety)
+        path = self.varietyFilepath(filetype, variety_cfg, target_year, source,
                                     region, root)
-        return self.gridFileManager(path, 'tool', target_year, variety, mode)
+        manager = \
+            self.gridFileManager(path, 'tool', target_year, variety_cfg, mode)
+        return manager
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def varietyFileReader(self, variety, target_year, source, region,
                                 filetype='season', root='tooldata'):
-        path = self.varietyFilepath(filetype, target_year, variety, source,
+        variety_cfg = self.varietyConfig(variety)
+        path = self.varietyFilepath(filetype, variety_cfg, target_year, source,
                                     region, root)
-        return self.gridFileReader(path, 'tool', target_year, variety)
+        return self.gridFileReader(path, 'tool', target_year, variety_cfg)
 
     # - - - # - - - # - - - # - - - # - - - # - - - # - - - # - - - # - - - #
 
@@ -359,60 +417,56 @@ class GrapeHardinessBuildFactory(GrapeHardinessToolFactory):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def buildFileManager(self, filetype, target_year, source, region,
-                               variety=None, mode='r'):
+                               variety=None, root='build', mode='r'):
         if filetype == 'tempext':
-            path = self.tempextFilepath(target_year, source, region, 'build')
+            path = self.tempextFilepath(target_year, source, region, root)
             return self.gridFileManager(path, 'tempext', mode=mode)
         else:
             path = self.varietyFilepath(filetype, variety, target_year, source,
-                                        region, 'build')
-            return self.gridFileManager(filepath, filetype, target_year,
-                                        variety, mode, chill=self.tool.chill,
+                                        region, root)
+            return self.gridFileManager(path, filetype, target_year, variety,
+                                        mode, chill=self.tool.chill,
                                         dormancy=self.tool.dormancy)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def buildFileReader(self, filetype, target_year, source, region,
-                              variety=None):
+                              variety=None, root='build'):
         if filetype == 'tempext':
-            path = self.tempextFilepath(target_year, source, region, 'build')
+            path = self.tempextFilepath(target_year, source, region, root)
             return self.gridFileReader(path, 'tempext', target_year)
         else:
             path = self.varietyFilepath(filetype, variety, target_year, source,
-                                        region, 'build')
+                                        region, root)
             return self.gridFileReader(path, filetype, target_year, variety)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def tempextFileBuilder(self, target_year, source, region, mode='a',
-                                 **kwargs):
-        path = self.tempextFilepath(target_year, source, region, 'build')
+    def tempextFileBuilder(self, target_year, source, region, mode='w',
+                                 root='build', **kwargs):
         Class = self.fileAccessorClass('tempext', 'build')
+        path = self.tempextFilepath(target_year, source, region, root)
         return Class(path, 'tempext', target_year, source, region, **kwargs)
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def varietyFileBuilder(self, variety, target_year, source, region,
-                                 filetype='season', mode='a', **kwargs):
+    def varietyFileBuilder(self, variety, target_year, start_date, end_date,
+                                 source, region, filetype='season',
+                                 mode='w', root='build', **kwargs):
         path = self.varietyFilepath(filetype, variety, target_year, source,
-                                    region, 'build')
+                                    region, root)
         Class = self.fileAccessorClass('tool', 'build')
-        return Class(path, filetype, target_year, variety, source, region, 
-                     self.tool.dormancy, self.tool.chill, **kwargs)
+        return Class(path, target_year, start_date, end_date, source, region,
+                     variety, self.tool.dormancy, self.tool.chill, filetype,
+                     mode, **kwargs)
 
     # - - - # - - - # - - - # - - - # - - - # - - - # - - - # - - - # - - - #
 
     def _registerAccessClasses(self):
-        from grapehard.grid import GrapeHardinessFileBuilder
         self._registerToolAccessClasses()
-        self._registerAccessManager('tool', 'build', GrapeHardinessFileBuilder)
-
-        from grapehard.grid import GrapeTemperatureFileBuilder
         self._registerTempAccessClasses()
-        self._registerAccessManager('tempext', 'build',
-                                    GrapeTemperatureFileBuilder)
-
         self._registerAccessManagers('build',
                                      GrapeHardinessFileReader,
                                      GrapeHardinessFileManager,
-                                     GrapeHardinessFileManager)
+                                     GrapeHardinessFileBuilder)
+

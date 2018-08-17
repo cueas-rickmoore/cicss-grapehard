@@ -1,10 +1,10 @@
 
 ;(function(jQuery) {
 var tooltipFormatter = function() {
-    var tip = '<span style="font-size:12px;font-weight:bold;text-align:center">' + Highcharts.dateFormat('%b %d, %Y', this.x) + '</span>'
+    var tip = '<span style="font-size:12px;font-weight:bold;text-align:center">' + Highcharts.dateFormat('%b %d, %Y', this.x) + '</span>';
     jQuery.each(this.points, function() { if (this.series.type == "line") { tip += '<br/>' + this.y + ' : <span style="color:'+this.color+'">' + this.series.name + '</span>'; } });
     return tip;
-}
+};
 
 var ChartController = {
     area_threshold: -999.0,
@@ -17,9 +17,8 @@ var ChartController = {
         credits: { text:"Powered by NRCC", href:"http://www.nrcc.cornell.edu/", color:"#000000" },
         title: { text: 'Grape Hardiness @ T50' },
         subtitle: { text: 'location address', style:{"font-size":"14px", color:"#000000"} },
-        xAxis: { type:'datetime', crosshair:{ width:1, color:"#ff0000", snap:true }, labels:{ style:{color:"#000000"} },
+        xAxis: { type:'datetime', crosshair:{ width:1, color:"#ff0000", snap:true, zIndex:10 }, labels:{ style:{color:"#000000"} },
                  dateTimeLabelFormats:{ millisecond:'%H:%M:%S.%L', second:'%H:%M:%S', minute:'%H:%M', hour:'%H:%M', day:'%d %b', week:'%d %b', month:'%b<br/>%Y', year:'%Y' },
-                 crosshair: { width:1, color:"#ff0000", snap:true, zIndex:10 },
                 },
         yAxis: { title:{ text:'Temperature', style:{"font-size":"14px", color:"#000000"}}, gridZIndex:4, labels:{style:{color:"#000000"}},
                  },
@@ -31,11 +30,11 @@ var ChartController = {
 
     components: {
         "hardarea" : { name: 'T50 Damage Potential', type:"area", zIndex:2, lineWidth:0, color:"#ffb3b3", marker: { enabled:false, states:{hover:{enabled:false}} } },
-        "hardfcast" : { name: "Hardiness Forecast", type:"line", zIndex:12, lineWidth:0, color:"#00cc00", marker: { enabled:true, fillColor: "#00cc00", lineWidth:0, lineColor:"#00cc00", radius:3, symbol:"circle" } },
-        "hardtemp" : { name: "Hardiness Temp", type:"line", zIndex:11, lineWidth:2, color:"#00cc00", marker: { enabled:true, fillColor: "#00cc00", lineWidth:1, lineColor:"#00cc00", radius:3, symbol:"circle" } },
+        "hardfcast" : { name: "Hardiness Forecast", type:"line", zIndex:12, lineWidth:2, dashStyle:'Dot', color:"#00cc00", marker: { enabled:true, fillColor:"#00cc00", lineWidth:1, lineColor:"#00cc00", radius:3, symbol:"circle" } },
+        "hardtemp" : { name: "Hardiness Temp", type:"line", zIndex:11, lineWidth:2, color:"#00cc00", marker: { enabled:true, fillColor:"#00cc00", lineWidth:1, lineColor:"#00cc00", radius:3, symbol:"circle" } },
         "mintarea" : { name: 'No Damage Potential', type:"area", zIndex:3, lineWidth:0, color:"#ffffff", fillOpacity:1.0, showInLegend:false, marker: { enabled:false, states:{hover:{enabled:false}} } },
         "mintemp" : { name: "Min Temperature", type:"line", zIndex:13, lineWidth:2, color:"#0000ff", marker:{enabled:false,} },
-        "minfcast" : { name: "Min Temp Forecast", type:"line", zIndex:14, lineWidth:0, color:"#0000ff", marker:{enabled:false,} },
+        "minfcast" : { name: "Min Temp Forecast", type:"line", zIndex:14, lineWidth:2, dashStyle:'Dot', color:"#0000ff", marker: { enabled:true, fillColor:"#0000ff", lineWidth:1, lineColor:"#0000ff", radius:3, symbol:"circle" } },
     },
 
     data: { },
@@ -100,7 +99,7 @@ var ChartController = {
         this.tool.logObjectAttrs(this.view);
         var mint = this.tool.fullview("mint", this.view);
         var extremes = this.dataExtremes(mint);
-        var min_mint = extremes[0]; 
+        var min_mint = extremes[0];
         var hardtemp = this.tool.fullview("hardtemp", this.view);
         extremes = this.dataExtremes(hardtemp);
         if (min_mint < extremes[0]) {
@@ -117,6 +116,11 @@ var ChartController = {
     drawChartLabel: function() {
         var label = this.season + " " + this.chart_labels[this.chart_type];
         this.chart.renderer.text(label, 325, 85).css({ color:"#000000", fontSize:"16px"}).add();
+    },
+
+    drawErrorLabel: function(season) {
+        var label = season + " Season is not avalaible";
+        this.chart.renderer.text(label, 200, 85).css({ color: "#ff0000", fontSize: "20px"}).add();
     },
 
     execCallback: function(event_type, info) {
@@ -148,7 +152,8 @@ var ChartController = {
         config.subtitle.text = this.subtitle();
         jQuery(this.chart_anchor).highcharts("Chart", config);
         this.chart = jQuery(this.chart_anchor).highcharts();
-        this.drawChartLabel();
+        if (arguments.length == 0) { this.drawChartLabel();
+        } else { this.drawErrorLabel(arguments[0]); }
         this.drawn = [ ];
     },
 
@@ -223,6 +228,7 @@ var jQueryDisplayProxy = function() {
         var arg_1 = arguments[1];
         switch(arg_0) {
             case "options": ChartController.setOptions(arg_1); break;
+            case "show_error": ChartController.newChart(arg_1); break;
             default: ChartController.setOption(arg_0, arg_1); break;
         } // end of 2 argument switch
 

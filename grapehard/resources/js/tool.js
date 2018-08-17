@@ -393,6 +393,14 @@ ToolDatesManager.prototype.init = function(season, season_start_day, season_end_
     this._updateView_();
 }
 
+ToolDatesManager.prototype.isValidDate = function(any_date) {
+    var month = any_date.getMonth() + 1;
+    var day = any_date.getDate();
+    if (month >= this.start_day[0] && day >= this.start_day[1]) { return true; }
+    if (month <= this.end_day[0] && day <= this.end_day[1]) { return true; }
+    return false;
+}
+
 ToolDatesManager.prototype.observedView = function(view) {
     var _view = view; if (typeof view === 'undefined') { _view = this.view; }
     if (this._dates_.fcast_start) { 
@@ -408,6 +416,32 @@ ToolDatesManager.prototype.pastDate = function(from_date, days_in_past) {
     if (typeof days_in_past !== 'undefined') { 
         return new Date( from_date.getTime() - days_in_past*this.ms_per_day);
     } else { return new Date( from_date.getTime() - this.ms_per_day); }
+}
+
+ToolDatesManager.prototype.seasonForDate = function(any_date) {
+    var year = any_date.getFullyear();
+    var start_date = this.adjustTimeZone(new Date(year,start_day[0]-1,start_day[1]));
+    if (any_date >= start_date) { return [year, year+1]; } else { return [year-1, year] }
+    var end_date = this.adjustTimeZone(new Date(year,end_day[0]-1,end_day[1]));
+    if (any_date <= end_date) { return [year-1, year]; } else { return [year, year+1] }
+}
+
+ToolDatesManager.prototype.seasonDescription = function(start_year, end_year) {
+    return start_year.toString() + "-" + end_year.toString() + " Season";
+}
+
+ToolDatesManager.prototype.seasonDescriptionFromDate = function(any_date) {
+    var year = any_date.getFullyear();
+    // date must be in a valid year 
+    if (year > this.tool.max_year || year < this.tool.min_year) { return this.seasonDescription(year-1); }
+    // check whether any_date is within valid bounds for a season starting in that year
+    var start_date = this.adjustTimeZone(new Date(year,this.season_start_day[0]-1,this.season_start_day[1]));
+    if (any_date < start_date) { return this.seasonDescription(year-1); } // any_date is in and earlier season
+    var end_date = this.adjustTimeZone(new Date(year+1,this.season_end_day[0]-1,this.season_end_day[1]));
+    if (any_date > end_date) { return this.seasonDescription(year); }
+    var month = any_date.getMonth() + 1;
+    if (month >= this.season_start_day[0]) { return this.seasonDescription(year+1);
+    } else { return this.seasonDescription(year); }
 }
 
 ToolDatesManager.prototype.seasonView = function() { return { start:this.season_start, end:this.last_valid, doi:this._dates_.doi }; }

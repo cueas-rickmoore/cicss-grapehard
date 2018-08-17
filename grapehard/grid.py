@@ -3,9 +3,10 @@ import datetime
 
 from atmosci.utils.timeutils import DateIterator
 
-from atmosci.seasonal.grid import SeasonalGridFileReader
-from atmosci.seasonal.grid import SeasonalGridFileManager
-from atmosci.seasonal.grid import SeasonalGridFileBuilder
+from atmosci.seasonal.grid import SeasonalGridFileReader,\
+                                  SeasonalGridFileManager,\
+                                  SeasonalGridFileBuilder,\
+                                  SeasonalDateGridFileBuilder
 
 from frost.grape.model import GrapeModelMethods 
 
@@ -80,14 +81,12 @@ class BasicGrapeHardinessMethods(BasicGrapehardToolMethods):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _initVariety_(self, variety):
-        print '\n\n_initVariety_\n', variety, '\n\n'
-        self.variety = variety
-        #self.acclimation_rate = variety.acclimation_rate
-        #self.deacclimation_rate = variety.deacclimation_rate
-        #self.ecodormancy_threshold = variety.ecodormancy_threshold
-        #self.hardiness = variety.hardiness
-        #self.stage_thresholds = variety.stage_thresholds
-        #self.theta = variety.theta
+        self.acclimation_rate = variety.acclimation_rate
+        self.deacclimation_rate = variety.deacclimation_rate
+        self.ecodormancy_threshold = variety.ecodormancy_threshold
+        self.hardiness = variety.hardiness
+        self.stage_thresholds = variety.stage_thresholds
+        self.theta = variety.theta
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -122,25 +121,21 @@ class GrapeHardinessFileManager(BasicGrapeHardinessMethods, GrapeModelMethods,
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 class GrapeHardinessFileBuilder(BasicGrapeHardinessMethods, GrapeModelMethods,
-                                SeasonalGridFileBuilder):
+                                SeasonalDateGridFileBuilder):
 
-    def __init__(self, filepath, filetype, target_year, variety, source,
-                       region, dormancy, chill, **kwargs):
+    def __init__(self, filepath, target_year, start_date, end_date, source, 
+                       region, variety, dormancy, chill, filetype='season',
+                       mode='w', **kwargs):
         #self._initGrapeProject_(target_year)
-        SeasonalGridFileBuilder.__init__(self, filepath, REGBASE, CONFIG, 
-                                               filetype, source, target_year,
-                                               region, **kwargs)
+        CONFIG.project.end_date = end_date
+        CONFIG.project.start_date = start_date
+        SeasonalDateGridFileBuilder.__init__(self, filepath, filetype, REGBASE,
+                                             CONFIG, target_year, start_date,
+                                             end_date, source, region, mode, 
+                                             **kwargs)
+
         self._initVariety_(variety)
         self._initManager_(chill=chill, dormancy=dormancy)
-
-    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-    def _projectStartDate(self, year, **kwargs):
-        start_date = kwargs.get('start_date', None)
-        if start_date is None:
-            day = self._projectStartDay(**kwargs)
-            return datetime.date(year-1, *day)
-        else: return start_date
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #

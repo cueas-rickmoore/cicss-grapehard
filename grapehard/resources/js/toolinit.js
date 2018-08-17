@@ -69,7 +69,7 @@
     ui.option("bind", "locationChangeRequest", function(ev, loc_obj) { GRAPEHARD.map_dialog("open", loc_obj.id); });
     ui.option("bind", "varietyChanged", function(ev, variety) { GRAPEHARD.locations.variety = variety; });
 
-    if (typeof NO_MAP_DAILOG === 'undefined') {
+    if (typeof google !== 'undefined') {
         var options = { width:600, height:500, google:google, default:GRAPEHARD.locations.state };
         jQuery("#csftool-input").append(GRAPEHARD.map_dialog_container);
         jQuery(GRAPEHARD.map_dialog_anchor).CsfToolLocationDialog(options);

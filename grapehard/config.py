@@ -129,8 +129,11 @@ del PKG_DIRPATH, RESOURCE_PATH, SERVER_DIRPATH
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 CONFIG.filenames = { 'build':'%(year)d-%(variety)s-Hardiness-Forecast.h5',
+                     'frost_temp':'%(year)d_temperatures.h5',
+                     'frost_variety':'%(year)d-Frost-Grape-%(variety)s.h5',
                      'history':'%(year)d-%(variety)s-Hardiness-History.h5',
                      'season':'%(year)d-%(variety)s-Hardiness-Daily.h5',
+                     'shared_temp':'%(year)d-%(source)s-%(region)s-Daily.h5',
                      'tempext':'%(year)d-%(source)s-%(region)s-Daily-Temps.h5',
                    }
 
@@ -300,18 +303,17 @@ CONFIG.tool.chart_labels = \
 CONFIG.tool.chart_types = '["season", "trend"]'
 
 # default location for this tool
-CONFIG.tool.default_location = 'Zappa'
-CONFIG.tool.locations = { 'Amorici': {'lat':42.953968, 'lon':-73.531014,
-       'address': '637 Colonel Burch Rd, Valley Falls, NY'},
-       'Bully_Hill': {'lat':42.429607, 'lon':-77.209084, 'variety':'cab_franc',
-       'address': '8843 Greyton H Taylor Memorial Dr, Hammondsport, NY'},
-       'Johnson': {'lat':42.307151, 'lon':-79.606418, 'variety':'concord',
-       'address':"Johnson Estate Winery, 8403 West Main St, Westfield, NY"},
+CONFIG.tool.default_location = 'Six_Mile'
+CONFIG.tool.locations = {
+#       'Amorici': {'lat':42.953968, 'lon':-73.531014,
+#       'address': '637 Colonel Burch Rd, Valley Falls, NY'},
+#       'Bully_Hill': {'lat':42.429607, 'lon':-77.209084, 'variety':'cab_franc',
+#       'address': '8843 Greyton H Taylor Memorial Dr, Hammondsport, NY'},
+#       'Johnson': {'lat':42.307151, 'lon':-79.606418, 'variety':'concord',
+#       'address':"Johnson Estate Winery, 8403 West Main St, Westfield, NY"},
        'Six_Mile': {'lat':42.417942, 'lon':-76.454511, 
        'address':'Six Mile Creek Vineyard, 1551 Slaterville Rd, Ithaca, NY' },
-       'Stein': {'lat':43.014665, 'lon':-77.933032,
-       'address': 'Stein Farm, 8343 Gully Rd, LeRoy, NY'},
-       'Zappa': {'lat':45.450908, 'lon':-70.487016,
-       'address':"Joe's Garage, MidlONoWhe, Somerset County, ME"},
+#       'Macari': {'lat':40.986826, 'lon':-72.567846,
+#       'address': 'Macari Vineyards, 150 Bergen Ave, Mattituck, NY'},
        }
 

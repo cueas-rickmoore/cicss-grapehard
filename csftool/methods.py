@@ -135,10 +135,17 @@ class CsfToolRequestHandlerMethods:
         location_dict = request_dict.get('location', None)
         if location_dict is None:
             location_dict = self.defaultLocation()
+
         if 'coords' not in location_dict:
             location_dict['coords'] = \
                 [ location_dict['lat'], location_dict['lon'] ]
             del location_dict['lat'], location_dict['lon']
+
+        if 'id' in location_dict:
+            if 'key' not in location_dict:
+                location_dict['key'] = location_dict['id']
+            del location_dict['id'] 
+
         return location_dict
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -418,12 +425,18 @@ class CsfToolVarietyRequestHandlerMethods(CsfToolRequestHandlerMethods):
 
     def extractVarietyParameters(self, request):
         tool = self.tool
-        variety = request.get('variety', tool.get('variety',
-                              tool.get('default_variety',
-                              tool.get('varieties.default_variety', None) ) )
-                             )
+        variety = request.get('variety', None)
+        if variety is None:
+            location = request.get('location', None)
+            if location is not None:
+                variety = location.get('variety', None)
+
+        if variety is None:
+            variety = tool.get('variety', tool.get('default_variety',
+                      tool.get('varieties.default_variety', None) ) )
         if variety is not None: return { 'variety':variety }
 
         errmsg = 'Unable to determine variety from request or %s'
-        raise LookupError, errmsg % 'handler configuration properties.'
+        errmsg = errmsg % self.__class__.__name__
+        raise LookupError, '%s configuration properties.' % errmsg
 
